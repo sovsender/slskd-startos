@@ -91,6 +91,7 @@ export default {
     86: 'Velocidad total de descarga para todas las descargas. Vacío significa sin límite.',
     87: 'Límites de transferencia',
     88: 'Limita cuántas transferencias se ejecutan a la vez y cuánto ancho de banda usan. Al guardar, slskd se reinicia.',
+    89: 'Sin conexión, y slskd ha dejado de reintentarlo. Alguien se desconectó en la interfaz web de slskd, se rechazó el inicio de sesión o esta cuenta de Soulseek inició sesión desde otro cliente. Revisa los registros y vuelve a conectarte desde la interfaz web o reinicia slskd.',
   },
   de_DE: {
     0: 'Download-Ort',
@@ -182,6 +183,7 @@ export default {
     86: 'Gesamte Download-Geschwindigkeit für alle Downloads. Leer bedeutet kein Limit.',
     87: 'Übertragungslimits',
     88: 'Begrenzt, wie viele Übertragungen gleichzeitig laufen und wie viel Bandbreite sie nutzen. Beim Speichern startet slskd neu.',
+    89: 'Nicht verbunden, und slskd versucht es nicht mehr. Jemand hat in der Weboberfläche von slskd getrennt, die Anmeldung wurde abgelehnt oder dieses Soulseek-Konto hat sich in einem anderen Client angemeldet. Prüfe die Logs und verbinde dich dann in der Weboberfläche erneut oder starte slskd neu.',
   },
   pl_PL: {
     0: 'Lokalizacja pobierania',
@@ -273,6 +275,7 @@ export default {
     86: 'Łączna prędkość pobierania dla wszystkich pobrań. Puste oznacza brak limitu.',
     87: 'Limity transferu',
     88: 'Ogranicza, ile transferów działa jednocześnie i ile przepustowości używają. Zapisanie uruchamia slskd ponownie.',
+    89: 'Brak połączenia, a slskd przestał ponawiać próby. Ktoś rozłączył w interfejsie webowym slskd, logowanie zostało odrzucone albo to konto Soulseek zalogowało się w innym kliencie. Sprawdź logi, a potem połącz się ponownie w interfejsie webowym albo uruchom slskd ponownie.',
   },
   fr_FR: {
     0: 'Emplacement de téléchargement',
@@ -364,5 +367,6 @@ export default {
     86: 'Vitesse de téléchargement totale pour tous les téléchargements. Vide signifie aucune limite.',
     87: 'Limites de transfert',
     88: "Limite le nombre de transferts simultanés et la bande passante qu'ils utilisent. L'enregistrement redémarre slskd.",
+    89: "Non connecté, et slskd a cessé de réessayer. Quelqu'un s'est déconnecté dans l'interface web de slskd, la connexion a été refusée, ou ce compte Soulseek s'est connecté depuis un autre client. Consultez les journaux, puis reconnectez-vous depuis l'interface web ou redémarrez slskd.",
   },
 } satisfies Record<string, LangDict>

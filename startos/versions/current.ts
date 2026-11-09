@@ -1,18 +1,18 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.26.2:1',
+  version: '0.26.2:2',
   releaseNotes: {
     en_US:
-      'Lidarr Automation has new settings: Download Only Music Files, Filename Match, Include Artist in Searches, Albums to Search For (missing albums, albums below the quality cutoff, or both), and Albums per Check. The new Transfer Limits action sets upload and download slots and speed limits.',
+      'The Soulseek Network status now says when slskd has stopped trying to reconnect: after a disconnect in its web interface, a refused login, or the same account logging in elsewhere. Connect again from the web interface or restart slskd.',
     es_ES:
-      'Automatización de Lidarr tiene nuevos ajustes: Descargar solo archivos de música, Coincidencia de nombres de archivo, Incluir el artista en las búsquedas, Álbumes que buscar (los que faltan, los que están bajo el umbral de calidad o ambos) y Álbumes por comprobación. La nueva acción Límites de transferencia fija las ranuras y los límites de velocidad de subida y de descarga.',
+      'El estado Red Soulseek ahora indica cuándo slskd ha dejado de intentar reconectarse: tras una desconexión en su interfaz web, un inicio de sesión rechazado o la misma cuenta iniciando sesión en otro lugar. Vuelve a conectarte desde la interfaz web o reinicia slskd.',
     de_DE:
-      'Die Lidarr-Automatisierung hat neue Einstellungen: Nur Musikdateien herunterladen, Dateinamen-Übereinstimmung, Künstler in Suchen einbeziehen, Zu suchende Alben (fehlende, unter dem Qualitäts-Cutoff oder beides) und Alben pro Durchlauf. Die neue Aktion Übertragungslimits legt Upload- und Download-Slots sowie Geschwindigkeitslimits fest.',
+      'Der Status Soulseek-Netzwerk zeigt jetzt an, wenn slskd keine neue Verbindung mehr versucht: nach einer Trennung in der Weboberfläche, einer abgelehnten Anmeldung oder wenn sich dasselbe Konto anderswo anmeldet. Verbinde dich in der Weboberfläche erneut oder starte slskd neu.',
     pl_PL:
-      'Automatyzacja Lidarr ma nowe ustawienia: Pobieraj tylko pliki muzyczne, Dopasowanie nazw plików, Uwzględniaj wykonawcę w wyszukiwaniu, Albumy do wyszukania (brakujące, poniżej progu jakości lub oba rodzaje) i Albumy na sprawdzenie. Nowa akcja Limity transferu ustawia liczbę slotów oraz limity prędkości wysyłania i pobierania.',
+      'Stan Sieć Soulseek pokazuje teraz, kiedy slskd przestał próbować ponownie się połączyć: po rozłączeniu w interfejsie webowym, odrzuconym logowaniu lub zalogowaniu tego samego konta gdzie indziej. Połącz się ponownie w interfejsie webowym albo uruchom slskd ponownie.',
     fr_FR:
-      "L'automatisation Lidarr a de nouveaux réglages : Télécharger uniquement les fichiers musicaux, Correspondance des noms de fichiers, Inclure l'artiste dans les recherches, Albums à rechercher (manquants, sous le seuil de qualité, ou les deux) et Albums par vérification. La nouvelle action Limites de transfert règle les emplacements et les limites de vitesse d'envoi et de téléchargement.",
+      "L'état Réseau Soulseek indique désormais quand slskd a cessé d'essayer de se reconnecter : après une déconnexion dans son interface web, une connexion refusée ou le même compte connecté ailleurs. Reconnectez-vous depuis l'interface web ou redémarrez slskd.",
   },
   migrations: {
     up: async ({ effects }) => {},

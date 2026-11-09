@@ -90,6 +90,7 @@ const dict = {
   'Total download speed for all downloads. Empty means no limit.': 86,
   'Transfer Limits': 87,
   'Limit how many transfers run at once and how much bandwidth they use. Saving restarts slskd.': 88,
+  'Not connected, and slskd has stopped retrying. Someone disconnected in the slskd web interface, the login was refused, or this Soulseek account logged in from another client. Check the logs, then connect again from the web interface or restart slskd.': 89,
 } as const
 
 /**

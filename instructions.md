@@ -23,6 +23,8 @@ Install FileBrowser Quantum or NextExplorer first. If you plan to use Lidarr Aut
 
 If Soulseek Network says the login was refused, the username probably belongs to someone else. Run **Soulseek Account** again with a different name.
 
+If Soulseek Network says slskd has stopped retrying, it stays offline until you connect again in the slskd web interface or restart slskd. This happens after someone disconnects in the web interface, or when the same Soulseek account logs in from another app: use a separate account for each.
+
 ## Using slskd
 
 ### Sharing

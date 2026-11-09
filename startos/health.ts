@@ -11,19 +11,28 @@ type ServerState = {
   isLoggingIn?: boolean
 }
 
+type AppState = {
+  server?: ServerState
+  connectionWatchdog?: { isEnabled?: boolean }
+}
+
 export async function soulseekStatus(
   apiKey: string,
   username: string,
   assignedPeerPort: number | null,
 ): Promise<Result> {
   let server: ServerState
+  let autoReconnect: boolean
   try {
     const res = await fetch(`http://127.0.0.1:${uiPort}/api/v0/application`, {
       headers: { 'X-API-Key': apiKey },
       signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) throw new Error(String(res.status))
-    server = ((await res.json()) as { server?: ServerState }).server ?? {}
+    const state = (await res.json()) as AppState
+    server = state.server ?? {}
+    // slskd stops its reconnect watchdog after a manual disconnect, a refused login, or a kick.
+    autoReconnect = state.connectionWatchdog?.isEnabled ?? true
   } catch {
     return { result: 'starting', message: i18n('Waiting for slskd') }
   }
@@ -54,6 +63,14 @@ export async function soulseekStatus(
       result: 'failure',
       message: i18n(
         'Connected, but the login was refused. The username may belong to someone else, or the password is wrong; change them in Soulseek Account.',
+      ),
+    }
+  }
+  if (!autoReconnect) {
+    return {
+      result: 'failure',
+      message: i18n(
+        'Not connected, and slskd has stopped retrying. Someone disconnected in the slskd web interface, the login was refused, or this Soulseek account logged in from another client. Check the logs, then connect again from the web interface or restart slskd.',
       ),
     }
   }
