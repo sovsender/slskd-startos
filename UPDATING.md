@@ -2,6 +2,8 @@
 
 This package pins three upstream sources: the slskd Docker image, and the Soularr commit and Python base image the `soularr` image is built from.
 
+The **Check upstream** workflow runs every Monday and opens an issue when slskd publishes a newer stable release, saying whether its image is on Docker Hub for both architectures, or when Soularr publishes a release newer than the pinned commit; it doesn't watch the Python base image. GitHub pauses scheduled workflows in a public repository after 60 days without activity; re-enable it from the repository's **Actions** tab.
+
 ## slskd
 
 ### Determining the upstream version

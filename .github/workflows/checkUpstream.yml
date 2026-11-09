@@ -1,0 +1,127 @@
+name: Check upstream
+
+# Opens an issue when slskd publishes a stable release newer than the image
+# pinned in startos/manifest/index.ts, or when Soularr publishes a release
+# newer than the commit pinned in soularr.Dockerfile.
+on:
+  schedule:
+    - cron: '23 15 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  slskd:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Compare the pinned image with the latest stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          manifest=$(gh api -H 'Accept: application/vnd.github.raw' \
+            "repos/$GITHUB_REPOSITORY/contents/startos/manifest/index.ts")
+          pinned=$(grep -oP "slskd/slskd:\K[0-9.]+" <<<"$manifest")
+          latest=$(gh api 'repos/slskd/slskd/releases?per_page=100' \
+              --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+
+          if [ "$(printf '%s\n' "$pinned" "$latest" | sort -V | tail -n 1)" = "$pinned" ]; then
+            echo "Up to date: the package pins $pinned and the latest stable release is $latest."
+            exit 0
+          fi
+
+          title="slskd $latest is available"
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 200 --json number,title,state)
+          if jq -e --arg t "$title" 'any(.[]; .title == $t)' <<<"$issues" >/dev/null; then
+            echo "An issue for $latest already exists."
+            exit 0
+          fi
+
+          image="slskd/slskd:$latest"
+          if tag=$(curl -fsS "https://hub.docker.com/v2/repositories/slskd/slskd/tags/$latest"); then
+            arches=$(jq -r '[.images[].architecture] | unique | join(", ")' <<<"$tag")
+            if jq -e '[.images[].architecture] | any(. == "amd64") and any(. == "arm64")' <<<"$tag" >/dev/null; then
+              status="\`$image\` is on Docker Hub for amd64 and arm64."
+            else
+              status="\`$image\` is on Docker Hub, but only for $arches. The package needs amd64 and arm64."
+            fi
+          else
+            status="\`$image\` is not on Docker Hub yet. Wait for it before bumping."
+          fi
+
+          body=$(cat <<EOF
+          slskd [$latest](https://github.com/slskd/slskd/releases/tag/$latest) is out. This package pins $pinned.
+
+          $status
+
+          Follow [UPDATING.md]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/master/UPDATING.md) to bump the package.
+          EOF
+          )
+
+          url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body")
+          echo "Opened $url"
+
+          jq -r '.[] | select(.state == "OPEN" and (.title | test("^slskd [0-9.]+ is available$"))) | .number' <<<"$issues" \
+            | while read -r n; do
+                gh issue close "$n" --repo "$GITHUB_REPOSITORY" --comment "Superseded by #${url##*/}."
+              done
+
+  soularr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Compare the pinned commit with the latest stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          dockerfile=$(gh api -H 'Accept: application/vnd.github.raw' \
+            "repos/$GITHUB_REPOSITORY/contents/soularr.Dockerfile")
+          pinned=$(grep -oP "SOULARR_COMMIT=\K[0-9a-f]{40}" <<<"$dockerfile")
+          pinned_tag=$(gh api 'repos/mrusse/soularr/tags?per_page=100' \
+            | jq -r --arg c "$pinned" 'first(.[] | select(.commit.sha == $c) | .name) // empty')
+          pinned_label="\`${pinned:0:7}\`${pinned_tag:+ ($pinned_tag)}"
+
+          latest=$(gh api 'repos/mrusse/soularr/releases?per_page=100' \
+              --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+          latest_commit=$(gh api "repos/mrusse/soularr/commits/$latest" --jq .sha)
+
+          # "behind" means the pinned commit is newer than the release.
+          relation=$(gh api "repos/mrusse/soularr/compare/$pinned...$latest_commit" --jq .status)
+          if [ "$relation" = identical ] || [ "$relation" = behind ]; then
+            echo "Up to date: the package pins $pinned_label and the latest stable release is $latest."
+            exit 0
+          fi
+
+          title="Soularr $latest is available"
+          issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 200 --json number,title,state)
+          if jq -e --arg t "$title" 'any(.[]; .title == $t)' <<<"$issues" >/dev/null; then
+            echo "An issue for $latest already exists."
+            exit 0
+          fi
+
+          body=$(cat <<EOF
+          Soularr [$latest](https://github.com/mrusse/soularr/releases/tag/$latest) is out. This package builds Soularr from $pinned_label.
+
+          Set \`SOULARR_COMMIT\` in \`soularr.Dockerfile\` to \`$latest_commit\`, the commit $latest points to. The \`soularr\` image is built from source, so there is no upstream image to wait for.
+
+          Follow [UPDATING.md]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/master/UPDATING.md) to bump the package.
+          EOF
+          )
+
+          url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body")
+          echo "Opened $url"
+
+          jq -r '.[] | select(.state == "OPEN" and (.title | test("^Soularr v[0-9.]+ is available$"))) | .number' <<<"$issues" \
+            | while read -r n; do
+                gh issue close "$n" --repo "$GITHUB_REPOSITORY" --comment "Superseded by #${url##*/}."
+              done
