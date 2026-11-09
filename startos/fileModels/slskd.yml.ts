@@ -31,6 +31,16 @@ const shape = z.looseObject({
     listen_ip_address: z.string(),
     listen_port: z.number(),
   }),
+  transfers: z.looseObject({
+    upload: z.looseObject({
+      slots: z.number(),
+      speed_limit: z.number().optional(),
+    }),
+    download: z.looseObject({
+      slots: z.number().optional(),
+      speed_limit: z.number().optional(),
+    }),
+  }),
 })
 
 // Written whole on every start; slskd cannot rewrite it while remote configuration is off.

@@ -73,11 +73,11 @@ The package owns three files. The two configuration files are rewritten whole on
 | `slskd.yml`  | YAML   | `main:/slskd/slskd.yml`    | Whole, before slskd starts                                  |
 | `config.ini` | INI    | `main:/soularr/config.ini` | Whole, before Soularr starts, while Lidarr Automation is on |
 
-`slskd.yml` sets remote configuration and remote file management off, the version check off, the downloads and incomplete directories, the shared directory (or none), the web listener (port 5030 on `0.0.0.0`, HTTPS off), authentication (user `admin`, the stored password, the stored JWT key, and the API keys), and the Soulseek username, password, and listen port 50300. Because remote configuration is off, slskd's web UI cannot edit the file, and every other slskd option keeps its upstream default.
+`slskd.yml` sets remote configuration and remote file management off, the startup version check off, the downloads and incomplete directories, the shared directory (or none), the web listener (port 5030 on `0.0.0.0`, HTTPS off), authentication (user `admin`, the stored password, the stored JWT key, and the API keys), the Soulseek username, password, and listen port 50300, and the upload and download slot and speed limits from Transfer Limits (a limit left empty is omitted, which slskd treats as unlimited). Because remote configuration is off, slskd's web UI cannot edit the file, and every other slskd option keeps its upstream default.
 
 The API keys in `slskd.yml` are limited to `127.0.0.1/32,::1/128`: `startos` (read-only), used by the Soulseek health check, and `soularr` (read-write), present only while Lidarr Automation is on.
 
-`config.ini` sets Lidarr's API key, bridge address, and download path; slskd's API key, address (`http://127.0.0.1:5030`), and download path; the preferred file types; `search_type = incrementing_page`; `number_of_albums_to_grab = 10`; and `log_to_file = False`, so Soularr logs only to the service log. Every other Soularr option uses Soularr's built-in fallback.
+`config.ini` sets Lidarr's API key, bridge address, and download path; slskd's API key, address (`http://127.0.0.1:5030`), and download path; `search_type = incrementing_page`; `log_to_file = False`, so Soularr logs only to the service log; and the values from Lidarr Automation: `allowed_filetypes`, `download_filtering`, `album_prepend_artist`, `minimum_filename_match_ratio`, `search_source`, and `number_of_albums_to_grab`. Every other Soularr option uses Soularr's built-in fallback.
 
 Environment variables set by the package: `PUID`, `PGID`, and `TZ` for slskd, read on every launch; `SOULARR_INTERVAL` (seconds) for the Soularr loop.
 
@@ -124,7 +124,8 @@ Every action saves to `store.json`, and the change takes effect on the next star
 - **Soulseek Account** — Run at install, or when the Soulseek Network check reports a refused login. It sets the Soulseek username and password. The password field is pre-filled with a random value. Safe to repeat.
 - **Download Location** — Run at install, or to move downloads. It chooses FileBrowser Quantum or NextExplorer and a folder in it; the folder is created if missing. Files already downloaded stay where they are. It refuses a folder that is, contains, or sits inside the shared folder.
 - **Sharing** — Run to share a folder, or clear the field to stop sharing. The folder must already exist in the same file manager as the download location. slskd scans it after the restart; a large library takes a while to scan. It refuses a folder that is, contains, or sits inside the download folder.
-- **Lidarr Automation** — Turns Soularr on or off and sets the preferred file types and the wait between passes. Turning it on declares Lidarr as a running dependency and adds the `soularr` API key to `slskd.yml`; turning it off removes both. Safe to repeat.
+- **Transfer Limits** — Run to cap upload or download slots or bandwidth, for example when Soulseek traffic slows the rest of your network. Upload slots default to 10; the other limits are empty, meaning unlimited. Safe to repeat.
+- **Lidarr Automation** — Turns Soularr on or off and sets what it searches for and accepts: preferred file types, music files only, artist in searches, filename match, which albums to search for, albums per check, and the wait between passes. Raise the filename match or turn on artist searches when Soularr picks wrong albums; lower them when it finds too little. Turning it on declares Lidarr as a running dependency and adds the `soularr` API key to `slskd.yml`; turning it off removes both. Safe to repeat.
 
 ## Tasks
 
@@ -160,11 +161,11 @@ Finished downloads and the shared folder live in the file manager and are backed
 
 ## Limitations and Differences
 
-1. slskd options that no action sets cannot be changed: remote configuration is off and `slskd.yml` is rewritten on every start. This covers speed and slot limits, user groups, blacklists, integrations (webhooks, scripts, FTP, Pushbullet), chat rooms, and the user profile.
+1. slskd options that no action sets cannot be changed: remote configuration is off and `slskd.yml` is rewritten on every start. This covers per-user upload limits, user groups, blacklists, integrations (webhooks, scripts, FTP, Pushbullet), chat rooms, and the user profile.
 2. Downloads go only to FileBrowser Quantum or NextExplorer; there is no download folder on the package's own volume.
 3. One shared folder, in the same file manager as the download location, and not overlapping the download folder. Whether it exists is checked only at start.
 4. You cannot add your own slskd API keys, and the package's keys work only from inside the package, so external tools (such as Lidarr plugins) cannot connect with a key.
-5. Soularr's web UI is not included: it has no login and shows both API keys. Only the preferred file types and the interval are configurable; other Soularr settings use its built-in defaults.
+5. Soularr's web UI is not included: it has no login and shows both API keys. Soularr settings that Lidarr Automation does not set, such as blacklists and accepted release countries, use its built-in defaults.
 6. The admin username is always `admin`.
 7. slskd's own HTTPS listener is off and its web listener is IPv4-only inside the container.
 8. The peer port must be reachable at external port 50300 for incoming connections. Soulseek cannot run over Tor: peers connect by IP address.
@@ -200,6 +201,7 @@ actions:
   - soulseek-account
   - download-location
   - sharing
+  - transfer-limits
   - lidarr-automation
 tasks:
   - { action: set-admin-password, severity: critical }

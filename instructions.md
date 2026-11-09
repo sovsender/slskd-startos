@@ -32,10 +32,16 @@ Many Soulseek users only send files to people who share something back. Run **Sh
 ### Lidarr Automation
 
 1. In Lidarr, run **Media Storage** and select the same file manager slskd downloads to.
-2. Here, run **Lidarr Automation**, choose **On**, and set your preferred file types and how often Soularr checks Lidarr.
+2. Here, run **Lidarr Automation** and choose **On**. The defaults suit most libraries; you can change the preferred file types and how often Soularr checks Lidarr.
 3. In Lidarr, add an artist or album and make sure it's monitored. Soularr picks up missing albums on its next check.
 
+If Soularr downloads the wrong albums, run **Lidarr Automation** again and raise **Filename Match** or turn on **Include Artist in Searches**. If it finds too little, lower the match or turn artist searches off.
+
 The **Lidarr Automation** status on the Dashboard tells you if Lidarr can't be reached, or if Lidarr can't see the download folder because it uses a different file manager.
+
+### Transfer limits
+
+If Soulseek traffic slows down the rest of your network, run **Transfer Limits** to cap upload and download slots and speeds.
 
 ### Receiving incoming connections
 
@@ -47,5 +53,5 @@ slskd connects directly to other Soulseek users, so they can see your server's i
 
 ## Limitations
 
-- Settings that aren't in the actions above, such as speed limits and user groups, can't be changed, including from slskd's own settings page.
+- Settings that aren't in the actions above, such as user groups and blacklists, can't be changed, including from slskd's own settings page.
 - Soularr's own web page isn't included, because it has no login and shows your keys.

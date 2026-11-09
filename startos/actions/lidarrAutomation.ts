@@ -31,6 +31,55 @@ const inputSpec = InputSpec.of({
               },
             ],
           }),
+          musicFilesOnly: Value.toggle({
+            name: i18n('Download Only Music Files'),
+            description: i18n(
+              'Skip the other files in a matching folder, such as cover art, playlists, and logs.',
+            ),
+            default: true,
+          }),
+          searchWithArtist: Value.toggle({
+            name: i18n('Include Artist in Searches'),
+            description: i18n(
+              'Search for the artist and album together instead of the album title alone. Fewer wrong matches for common titles, but fewer results.',
+            ),
+            default: false,
+          }),
+          matchRatio: Value.number({
+            name: i18n('Filename Match'),
+            description: i18n(
+              "How closely file names must match the album's track titles, from 0.5 (loose) to 1 (exact). Higher values reject more wrong albums, and more correct ones with unusual names.",
+            ),
+            default: 0.8,
+            required: true,
+            min: 0.5,
+            max: 1,
+            step: 0.05,
+            integer: false,
+          }),
+          searchSource: Value.select({
+            name: i18n('Albums to Search For'),
+            description: i18n(
+              "Missing: albums Lidarr does not have. Below cutoff: albums Lidarr has below the quality profile's cutoff. Both: missing ones first.",
+            ),
+            default: 'missing',
+            values: {
+              missing: i18n('Missing'),
+              cutoff_unmet: i18n('Below cutoff'),
+              all: i18n('Both'),
+            },
+          }),
+          albumsPerCheck: Value.number({
+            name: i18n('Albums per Check'),
+            description: i18n(
+              'How many wanted albums Soularr searches for in one pass. Each pass moves on to the next ones.',
+            ),
+            default: 10,
+            required: true,
+            min: 1,
+            max: 100,
+            integer: true,
+          }),
           intervalMinutes: Value.number({
             name: i18n('Check Interval'),
             description: i18n(
@@ -69,6 +118,11 @@ export const lidarrAutomation = sdk.Action.withInput(
     const store = await storeJson.read().const(effects)
     const on = {
       filetypes: store?.soularrFiletypes ?? 'flac,mp3 320',
+      musicFilesOnly: store?.soularrMusicFilesOnly ?? true,
+      searchWithArtist: store?.soularrSearchWithArtist ?? false,
+      matchRatio: store?.soularrMatchRatio ?? 0.8,
+      searchSource: store?.soularrSearchSource ?? 'missing',
+      albumsPerCheck: store?.soularrAlbumsPerCheck ?? 10,
       intervalMinutes: store?.soularrIntervalMinutes ?? 5,
     }
     return {
@@ -78,15 +132,20 @@ export const lidarrAutomation = sdk.Action.withInput(
     }
   },
 
-  async ({ effects, input }) =>
-    storeJson.merge(
-      effects,
-      input.mode.selection === 'on'
-        ? {
-            soularrEnabled: true,
-            soularrFiletypes: input.mode.value.filetypes,
-            soularrIntervalMinutes: input.mode.value.intervalMinutes,
-          }
-        : { soularrEnabled: false },
-    ),
+  async ({ effects, input }) => {
+    if (input.mode.selection === 'off') {
+      return storeJson.merge(effects, { soularrEnabled: false })
+    }
+    const on = input.mode.value
+    return storeJson.merge(effects, {
+      soularrEnabled: true,
+      soularrFiletypes: on.filetypes,
+      soularrMusicFilesOnly: on.musicFilesOnly,
+      soularrSearchWithArtist: on.searchWithArtist,
+      soularrMatchRatio: on.matchRatio,
+      soularrSearchSource: on.searchSource,
+      soularrAlbumsPerCheck: on.albumsPerCheck,
+      soularrIntervalMinutes: on.intervalMinutes,
+    })
+  },
 )

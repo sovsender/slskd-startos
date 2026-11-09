@@ -20,6 +20,17 @@ const shape = z.looseObject({
   soularrEnabled: z.boolean().catch(false),
   soularrFiletypes: z.string().catch('flac,mp3 320'),
   soularrIntervalMinutes: z.number().catch(5),
+  soularrSearchSource: z
+    .enum(['missing', 'cutoff_unmet', 'all'])
+    .catch('missing'),
+  soularrSearchWithArtist: z.boolean().catch(false),
+  soularrMatchRatio: z.number().catch(0.8),
+  soularrMusicFilesOnly: z.boolean().catch(true),
+  soularrAlbumsPerCheck: z.number().catch(10),
+  uploadSlots: z.number().catch(10),
+  uploadSpeedLimit: z.number().nullable().catch(null),
+  downloadSlots: z.number().nullable().catch(null),
+  downloadSpeedLimit: z.number().nullable().catch(null),
 })
 
 export const storeJson = FileHelper.json(

@@ -31,6 +31,8 @@ while :; do
   wait "$child"
 done`
 
+const pyBool = (value: boolean) => (value ? 'True' : 'False')
+
 async function folderExists(
   effects: T.Effects,
   dependencyId: FileManager,
@@ -150,6 +152,21 @@ export const main = sdk.setupMain(async ({ effects }) => {
       listen_ip_address: '0.0.0.0',
       listen_port: peerPort,
     },
+    // An absent limit is slskd's own default: unlimited.
+    transfers: {
+      upload: {
+        slots: store.uploadSlots,
+        ...(store.uploadSpeedLimit !== null
+          ? { speed_limit: store.uploadSpeedLimit }
+          : {}),
+      },
+      download: {
+        ...(store.downloadSlots !== null ? { slots: store.downloadSlots } : {}),
+        ...(store.downloadSpeedLimit !== null
+          ? { speed_limit: store.downloadSpeedLimit }
+          : {}),
+      },
+    },
   })
 
   let slskdMounts = sdk.Mounts.of()
@@ -259,7 +276,13 @@ export const main = sdk.setupMain(async ({ effects }) => {
           'Search Settings': {
             allowed_filetypes: store.soularrFiletypes,
             search_type: 'incrementing_page',
-            number_of_albums_to_grab: '10',
+            search_source: store.soularrSearchSource,
+            number_of_albums_to_grab: String(store.soularrAlbumsPerCheck),
+            minimum_filename_match_ratio: String(store.soularrMatchRatio),
+            album_prepend_artist: pyBool(store.soularrSearchWithArtist),
+          },
+          'Download Settings': {
+            download_filtering: pyBool(store.soularrMusicFilesOnly),
           },
           Logging: { log_to_file: 'False' },
         })
