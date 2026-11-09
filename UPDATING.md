@@ -47,3 +47,15 @@ curl -fsS https://hub.docker.com/v2/repositories/library/python/tags/3.11-slim |
 ### Applying the bump
 
 Replace the digest after `@`. Move to a newer Python minor version only after checking that Soularr's pinned requirements install on it.
+
+## Releasing
+
+1. Set `version` in `startos/versions/current.ts` and update `releaseNotes` in all five locales. A new slskd release is `<X.Y.Z>:0`. A Soularr or Python base image bump, or any other packaging change that should reach users, raises the revision after the colon (`0.26.2:1` → `0.26.2:2`). If `current.ts` carries a migration (an `up` that does work), first move that version to its own file, as the packaging guide's `versions.md` describes.
+2. Commit and push `master`. Nothing else is needed.
+
+The **Tag and Release** workflow runs on every push to `master` that changes more than Markdown. It reads the package id and `version` from `startos/versions/current.ts` and asks the registry in the `REFERENCE_REGISTRY` repository variable whether that version exists. If it does, the run stops; a push that doesn't change the version publishes nothing. Otherwise it force-pushes the tag `v` plus the version with `:` replaced by `_` (`0.26.2:1` → `v0.26.2_1`), builds both architectures, creates the GitHub Release with the `.s9pk` files, and adds them to the registry in `RELEASE_REGISTRY`, which downloads them from the release. It signs with the `DEV_KEY` repository secret, a CI key that registry authorizes to publish this package.
+
+- A push that bumps the version reaches users right away, so push the bump only after the change works on a box.
+- Keep `version` a quoted string literal; the workflow reads it from the file's text.
+- A published version is never rebuilt, so every change that should reach users needs a new version.
+- The **Release** workflow also builds and publishes when a `v*.*` tag is pushed by hand. The tag pushed by Tag and Release doesn't trigger it.
