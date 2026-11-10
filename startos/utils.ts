@@ -8,13 +8,14 @@ export const adminUsername = 'admin'
 
 export const appDir = '/app'
 export const soularrDataDir = '/data'
-export const lidarrShareMountpoint = '/mnt/lidarr'
 
 // Lidarr's published host id and internal port.
 export const lidarrHostId = 'ui-multi'
 export const lidarrPort = 8686
 
 export const localhostOnly = '127.0.0.1/32,::1/128'
+// The StartOS container bridge: requests from other services on this server arrive from it.
+export const bridgeOnly = '10.0.3.0/24,fd00:3::/64'
 
 export const fileManagers = {
   filebrowser: { mountpoint: '/mnt/filebrowser', defaultFolder: 'slskd' },

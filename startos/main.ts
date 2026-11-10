@@ -1,6 +1,7 @@
 import { FileHelper, T } from '@start9labs/start-sdk'
+import { access, mkdir } from 'fs/promises'
 import { configIni } from './fileModels/config.ini'
-import { slskdYml } from './fileModels/slskd.yml'
+import { SlskdYml, slskdYml } from './fileModels/slskd.yml'
 import { storeJson } from './fileModels/store.json'
 import { lidarrStatus, soulseekStatus } from './health'
 import { i18n } from './i18n'
@@ -8,13 +9,13 @@ import { sdk } from './sdk'
 import {
   adminUsername,
   appDir,
+  bridgeOnly,
   cleanFolder,
   FileManager,
   fileManagers,
   fileManagerTitles,
   lidarrHostId,
   lidarrPort,
-  lidarrShareMountpoint,
   localhostOnly,
   peerHostId,
   peerPort,
@@ -54,9 +55,58 @@ async function folderExists(
   ).catch(() => false)
 }
 
+const lidarrShare = sdk.volumes.startos.subpath('lidarr-share')
+const lidarrApiKeyFile = FileHelper.string(`${lidarrShare}/api-key`)
+
+async function readLidarrApiKey(effects: T.Effects) {
+  try {
+    // Mounting again unmounts first, pulling the file out from under the watcher.
+    const mounted = await access(`${lidarrShare}/api-key`).then(
+      () => true,
+      () => false,
+    )
+    if (!mounted) {
+      await mkdir(lidarrShare, { recursive: true })
+      await sdk.mount(effects, {
+        location: lidarrShare,
+        target: {
+          packageId: 'lidarr',
+          volumeId: 'startos',
+          subpath: 'share',
+          readonly: true,
+          idmap: [],
+        },
+      })
+    }
+    return await lidarrApiKeyFile
+      .read(
+        (key) => key,
+        (prev, next) => next === null || prev === next,
+      )
+      .const(effects)
+  } catch {
+    return null
+  }
+}
+
+// Read by health checks that outlive the build that created them.
+const live = {
+  assignedPeerPort: null as number | null,
+  lidarr: null as {
+    address: string
+    apiKey: string
+    downloadDir: string
+    fileManager: string
+    minutes: number
+  } | null,
+}
+
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info(i18n('Starting slskd!'))
+  return sdk.Daemons.dynamic(effects, (fn) => build(effects, fn.effects))
+})
 
+async function build(root: T.Effects, effects: T.Effects) {
   const store = await storeJson.read().const(effects)
   const adminPassword = store?.adminPassword
   const jwtKey = store?.jwtKey
@@ -93,7 +143,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
   if (!installed) {
     throw new Error(
       i18n(
-        '${fileManager} is not installed. Install it, or choose another download location.',
+        '${fileManager} is not installed. Install it, or choose another file manager in Download Folder.',
         { fileManager },
       ),
     )
@@ -105,7 +155,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     ? await folderExists(effects, target, shareFolder)
     : false
 
-  const assignedPeerPort = await sdk.host
+  live.assignedPeerPort = await sdk.host
     .getOwn(
       effects,
       peerHostId,
@@ -113,7 +163,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
     )
     .const()
 
-  await slskdYml.write(effects, {
+  const pluginApiKey = store.lidarrPluginEnabled ? store.pluginApiKey : null
+
+  const yml: SlskdYml = {
     remote_configuration: false,
     remote_file_management: false,
     flags: { no_version_check: true },
@@ -143,6 +195,16 @@ export const main = sdk.setupMain(async ({ effects }) => {
                 },
               }
             : {}),
+          // Tubifarry's connection test reads /api/v0/options, which slskd reserves for administrators.
+          ...(pluginApiKey
+            ? {
+                lidarr: {
+                  key: pluginApiKey,
+                  role: 'administrator' as const,
+                  cidr: bridgeOnly,
+                },
+              }
+            : {}),
         },
       },
     },
@@ -167,7 +229,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
           : {}),
       },
     },
-  })
+  }
+  await slskdYml.write(effects, yml)
 
   let slskdMounts = sdk.Mounts.of()
     .mountVolume({
@@ -200,12 +263,10 @@ export const main = sdk.setupMain(async ({ effects }) => {
     'slskd-sub',
   )
 
-  let soularr: {
-    sub: typeof slskdSub
-    lidarrAddress: string
-    lidarrApiKey: string
-  } | null = null
-  let lidarrProblem: string | null = null
+  const minutes = store.soularrIntervalMinutes
+  let soularrSub: typeof slskdSub | null = null
+  let lidarrProblem: 'missing' | 'key' | null = null
+  live.lidarr = null
 
   if (store.soularrEnabled) {
     const lidarrAddress = await sdk.host
@@ -216,11 +277,47 @@ export const main = sdk.setupMain(async ({ effects }) => {
         ssl: false,
       })
       .const()
+    const lidarrApiKey = lidarrAddress ? await readLidarrApiKey(effects) : null
 
     if (!lidarrAddress) {
-      lidarrProblem = i18n('Lidarr is not installed')
+      lidarrProblem = 'missing'
+    } else if (!lidarrApiKey) {
+      lidarrProblem = 'key'
     } else {
-      const sub = sdk.SubContainer.of(
+      // Soularr reads this file at the start of every pass.
+      await configIni.write(effects, {
+        Lidarr: {
+          api_key: lidarrApiKey,
+          host_url: `http://${lidarrAddress}`,
+          download_dir: downloadDir,
+        },
+        Slskd: {
+          api_key: soularrApiKey,
+          host_url: `http://127.0.0.1:${uiPort}`,
+          url_base: '/',
+          download_dir: downloadDir,
+        },
+        'Search Settings': {
+          allowed_filetypes: store.soularrFiletypes,
+          search_type: 'incrementing_page',
+          search_source: store.soularrSearchSource,
+          number_of_albums_to_grab: String(store.soularrAlbumsPerCheck),
+          minimum_filename_match_ratio: String(store.soularrMatchRatio),
+          album_prepend_artist: pyBool(store.soularrSearchWithArtist),
+        },
+        'Download Settings': {
+          download_filtering: pyBool(store.soularrMusicFilesOnly),
+        },
+        Logging: { log_to_file: 'False' },
+      })
+      live.lidarr = {
+        address: lidarrAddress,
+        apiKey: lidarrApiKey,
+        downloadDir,
+        fileManager,
+        minutes,
+      }
+      soularrSub = sdk.SubContainer.of(
         effects,
         { imageId: 'soularr' },
         sdk.Mounts.of()
@@ -236,62 +333,11 @@ export const main = sdk.setupMain(async ({ effects }) => {
             subpath: downloadFolder,
             mountpoint: downloadDir,
             readonly: false,
-          })
-          .mountDependency({
-            dependencyId: 'lidarr',
-            volumeId: 'startos',
-            subpath: 'share',
-            mountpoint: lidarrShareMountpoint,
-            readonly: true,
           }),
         'soularr-sub',
       )
-
-      const lidarrApiKey = await FileHelper.string(
-        `${await sub.rootfs}${lidarrShareMountpoint}/api-key`,
-      )
-        .read(
-          (key) => key,
-          (prev, next) => next === null || prev === next,
-        )
-        .const(effects)
-
-      if (!lidarrApiKey) {
-        lidarrProblem = i18n(
-          'Lidarr has not shared its API key. Update Lidarr, then restart slskd.',
-        )
-      } else {
-        await configIni.write(effects, {
-          Lidarr: {
-            api_key: lidarrApiKey,
-            host_url: `http://${lidarrAddress}`,
-            download_dir: downloadDir,
-          },
-          Slskd: {
-            api_key: soularrApiKey,
-            host_url: `http://127.0.0.1:${uiPort}`,
-            url_base: '/',
-            download_dir: downloadDir,
-          },
-          'Search Settings': {
-            allowed_filetypes: store.soularrFiletypes,
-            search_type: 'incrementing_page',
-            search_source: store.soularrSearchSource,
-            number_of_albums_to_grab: String(store.soularrAlbumsPerCheck),
-            minimum_filename_match_ratio: String(store.soularrMatchRatio),
-            album_prepend_artist: pyBool(store.soularrSearchWithArtist),
-          },
-          'Download Settings': {
-            download_filtering: pyBool(store.soularrMusicFilesOnly),
-          },
-          Logging: { log_to_file: 'False' },
-        })
-        soularr = { sub, lidarrAddress, lidarrApiKey }
-      }
     }
   }
-
-  const minutes = store.soularrIntervalMinutes
 
   return sdk.Daemons.of(effects)
     .addOneshot('prepare-downloads', {
@@ -310,7 +356,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         display: i18n('Web Interface'),
         fn: () =>
           sdk.healthCheck.checkWebUrl(
-            effects,
+            root,
             `http://127.0.0.1:${uiPort}/health`,
             {
               successMessage: i18n('The web interface is ready'),
@@ -319,13 +365,19 @@ export const main = sdk.setupMain(async ({ effects }) => {
           ),
       },
       requires: ['prepare-downloads'],
+      // slskd restarts when its configuration changes; the checks that require it restart with it.
+      uses: { yml, shareFolder },
     })
     .addHealthCheck('soulseek', {
       ready: {
         display: i18n('Soulseek Network'),
         gracePeriod: 60_000,
         fn: () =>
-          soulseekStatus(startosApiKey, soulseekUsername, assignedPeerPort),
+          soulseekStatus(
+            startosApiKey,
+            soulseekUsername,
+            live.assignedPeerPort,
+          ),
       },
       requires: ['primary'],
     })
@@ -356,8 +408,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
           }
         : null,
     )
-    .addHealthCheck('lidarr', () =>
-      lidarrProblem
+    .addHealthCheck('lidarr-missing', () =>
+      lidarrProblem === 'missing'
         ? {
             ready: {
               display: i18n('Lidarr Automation'),
@@ -365,7 +417,25 @@ export const main = sdk.setupMain(async ({ effects }) => {
               trigger: sdk.trigger.onceTrigger,
               fn: () => ({
                 result: 'failure' as const,
-                message: lidarrProblem ?? '',
+                message: i18n('Lidarr is not installed'),
+              }),
+            },
+            requires: [],
+          }
+        : null,
+    )
+    .addHealthCheck('lidarr-key', () =>
+      lidarrProblem === 'key'
+        ? {
+            ready: {
+              display: i18n('Lidarr Automation'),
+              gracePeriod: 0,
+              trigger: sdk.trigger.onceTrigger,
+              fn: () => ({
+                result: 'failure' as const,
+                message: i18n(
+                  'Lidarr has not shared its API key. Update Lidarr, then restart slskd.',
+                ),
               }),
             },
             requires: [],
@@ -373,9 +443,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
         : null,
     )
     .addOneshot('prepare-soularr', () =>
-      soularr
+      soularrSub
         ? {
-            subcontainer: soularr.sub,
+            subcontainer: soularrSub,
             exec: {
               command: ['chown', '1000:1000', soularrDataDir],
               user: 'root',
@@ -384,28 +454,27 @@ export const main = sdk.setupMain(async ({ effects }) => {
           }
         : null,
     )
-    .addDaemon('soularr', () => {
-      if (!soularr) return null
-      const { lidarrAddress, lidarrApiKey } = soularr
-      return {
-        subcontainer: soularr.sub,
-        exec: {
-          command: ['sh', '-c', soularrLoop],
-          user: 'soularr',
-          env: { SOULARR_INTERVAL: String(minutes * 60) },
-        },
-        ready: {
-          display: i18n('Lidarr Automation'),
-          fn: () =>
-            lidarrStatus(
-              lidarrAddress,
-              lidarrApiKey,
-              downloadDir,
-              fileManager,
-              minutes,
-            ),
-        },
-        requires: ['primary', 'prepare-soularr'],
-      }
-    })
-})
+    .addDaemon('soularr', () =>
+      soularrSub
+        ? {
+            subcontainer: soularrSub,
+            exec: {
+              command: ['sh', '-c', soularrLoop],
+              user: 'soularr',
+              env: { SOULARR_INTERVAL: String(minutes * 60) },
+            },
+            ready: {
+              display: i18n('Lidarr Automation'),
+              fn: () =>
+                live.lidarr
+                  ? lidarrStatus(live.lidarr)
+                  : {
+                      result: 'starting' as const,
+                      message: i18n('Waiting for slskd'),
+                    },
+            },
+            requires: ['primary', 'prepare-soularr'],
+          }
+        : null,
+    )
+}

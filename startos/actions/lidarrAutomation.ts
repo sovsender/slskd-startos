@@ -1,20 +1,22 @@
 import { storeJson } from '../fileModels/store.json'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
+import { uiHostId, uiPort } from '../utils'
 
 const { InputSpec, Value, Variants } = sdk
 
 const inputSpec = InputSpec.of({
   mode: Value.union({
-    name: i18n('Lidarr Automation'),
+    name: i18n('Method'),
     description: i18n(
-      'When on, Soularr regularly reads the albums Lidarr is missing, downloads them through slskd, and asks Lidarr to import them. Lidarr then renames and moves them using its own Media Management settings.',
+      'Lidarr plugin: Lidarr searches and downloads through slskd itself, using the Tubifarry plugin you install in Lidarr. Saving shows the address and API key to enter in Lidarr. Soularr: a helper in this package regularly reads the albums Lidarr is missing, downloads them, and asks Lidarr to import them. Never use both at once.',
     ),
     default: 'off',
     variants: Variants.of({
       off: { name: i18n('Off'), spec: InputSpec.of({}) },
-      on: {
-        name: i18n('On'),
+      plugin: { name: i18n('Lidarr plugin'), spec: InputSpec.of({}) },
+      soularr: {
+        name: 'Soularr',
         spec: InputSpec.of({
           filetypes: Value.text({
             name: i18n('Preferred File Types'),
@@ -102,9 +104,9 @@ export const lidarrAutomation = sdk.Action.withInput(
   'lidarr-automation',
 
   async () => ({
-    name: i18n('Lidarr Automation'),
+    name: 'Lidarr',
     description: i18n(
-      'Let Soularr fetch the albums Lidarr wants from Soulseek. Requires Lidarr, using the same file manager as slskd. Saving restarts slskd.',
+      'Download the albums Lidarr wants from Soulseek. Lidarr moves each finished album from the download folder into its own Root Folder. Requires Lidarr, using the same file manager as slskd. Changing the method restarts slskd.',
     ),
     warning: null,
     allowedStatuses: 'any',
@@ -116,7 +118,7 @@ export const lidarrAutomation = sdk.Action.withInput(
 
   async ({ effects }) => {
     const store = await storeJson.read().const(effects)
-    const on = {
+    const soularr = {
       filetypes: store?.soularrFiletypes ?? 'flac,mp3 320',
       musicFilesOnly: store?.soularrMusicFilesOnly ?? true,
       searchWithArtist: store?.soularrSearchWithArtist ?? false,
@@ -125,27 +127,95 @@ export const lidarrAutomation = sdk.Action.withInput(
       albumsPerCheck: store?.soularrAlbumsPerCheck ?? 10,
       intervalMinutes: store?.soularrIntervalMinutes ?? 5,
     }
+    if (store?.soularrEnabled) {
+      return { mode: { selection: 'soularr' as const, value: soularr } }
+    }
     return {
-      mode: store?.soularrEnabled
-        ? { selection: 'on' as const, value: on }
-        : { selection: 'off' as const, value: {}, other: { on } },
+      mode: {
+        selection: store?.lidarrPluginEnabled
+          ? ('plugin' as const)
+          : ('off' as const),
+        value: {},
+        other: { soularr },
+      },
     }
   },
 
   async ({ effects, input }) => {
     if (input.mode.selection === 'off') {
-      return storeJson.merge(effects, { soularrEnabled: false })
+      await storeJson.merge(effects, {
+        soularrEnabled: false,
+        lidarrPluginEnabled: false,
+      })
+      return null
     }
-    const on = input.mode.value
-    return storeJson.merge(effects, {
-      soularrEnabled: true,
-      soularrFiletypes: on.filetypes,
-      soularrMusicFilesOnly: on.musicFilesOnly,
-      soularrSearchWithArtist: on.searchWithArtist,
-      soularrMatchRatio: on.matchRatio,
-      soularrSearchSource: on.searchSource,
-      soularrAlbumsPerCheck: on.albumsPerCheck,
-      soularrIntervalMinutes: on.intervalMinutes,
+    if (input.mode.selection === 'soularr') {
+      const soularr = input.mode.value
+      await storeJson.merge(effects, {
+        soularrEnabled: true,
+        lidarrPluginEnabled: false,
+        soularrFiletypes: soularr.filetypes,
+        soularrMusicFilesOnly: soularr.musicFilesOnly,
+        soularrSearchWithArtist: soularr.searchWithArtist,
+        soularrMatchRatio: soularr.matchRatio,
+        soularrSearchSource: soularr.searchSource,
+        soularrAlbumsPerCheck: soularr.albumsPerCheck,
+        soularrIntervalMinutes: soularr.intervalMinutes,
+      })
+      return null
+    }
+
+    const apiKey = await storeJson.read((s) => s.pluginApiKey).once()
+    const address = await sdk.host
+      .getBridgeAddress(effects, {
+        hostId: uiHostId,
+        internalPort: uiPort,
+        ssl: false,
+      })
+      .once()
+    if (!apiKey || !address) {
+      throw new Error(
+        i18n(
+          'slskd has no address or API key yet. Start slskd, then try again.',
+        ),
+      )
+    }
+    await storeJson.merge(effects, {
+      soularrEnabled: false,
+      lidarrPluginEnabled: true,
     })
+
+    return {
+      version: '1' as const,
+      title: i18n('Connect Lidarr'),
+      message: i18n(
+        'In Lidarr, install the Tubifarry plugin, then add Slskd under Settings > Indexers and again under Settings > Download Clients. Enter this URL and API key in both. Run this action again to see them later.',
+      ),
+      result: {
+        type: 'group' as const,
+        value: [
+          {
+            type: 'single' as const,
+            name: 'URL',
+            description: null,
+            value: `http://${address}`,
+            masked: false,
+            copyable: true,
+            qr: false,
+            launchable: false,
+          },
+          {
+            type: 'single' as const,
+            name: i18n('API Key'),
+            description: null,
+            value: apiKey,
+            masked: true,
+            copyable: true,
+            qr: false,
+            launchable: false,
+          },
+        ],
+      },
+    }
   },
 )

@@ -11,9 +11,13 @@ bare clone with no workspace, the full guide is at <https://docs.start9.com/pack
 - The download folder is mounted at `/mnt/filebrowser/<folder>` or `/mnt/nextexplorer/<folder>`
   because Lidarr mounts those file managers at the same roots. Soularr passes the slskd path to
   Lidarr unchanged, so changing a mountpoint here breaks imports.
-- The slskd API keys are limited to localhost. The package's JavaScript and the Soularr
-  subcontainer reach slskd at `127.0.0.1:5030`, which works because they share one network
-  namespace with `slskd-sub`.
+- The `startos` and `soularr` API keys are limited to localhost. The package's JavaScript and
+  the Soularr subcontainer reach slskd at `127.0.0.1:5030`, which works because they share one
+  network namespace with `slskd-sub`. Only the `lidarr` key, for Lidarr's plugin, accepts the
+  container bridge.
+- `main` returns `sdk.Daemons.dynamic`, which does not hash closures. A health check that reads
+  a value slskd's configuration does not contain must read it from `live`, or it keeps the value
+  from the build that started it.
 - Soularr's config parser expands `$`. Any user text written into `config.ini` must exclude it,
   which is what `folderPattern` and the file-type pattern enforce.
 - `web.ip_address` is `0.0.0.0` because slskd's default `[::]` aborts where IPv6 is unavailable.

@@ -8,6 +8,7 @@ const shape = z.looseObject({
   jwtKey: nullableString,
   startosApiKey: nullableString,
   soularrApiKey: nullableString,
+  pluginApiKey: nullableString,
   soulseekUsername: nullableString,
   soulseekPassword: nullableString,
   downloadTarget: z
@@ -18,6 +19,7 @@ const shape = z.looseObject({
   nextexplorerFolder: z.string().catch('Files/slskd'),
   shareFolder: nullableString,
   soularrEnabled: z.boolean().catch(false),
+  lidarrPluginEnabled: z.boolean().catch(false),
   soularrFiletypes: z.string().catch('flac,mp3 320'),
   soularrIntervalMinutes: z.number().catch(5),
   soularrSearchSource: z

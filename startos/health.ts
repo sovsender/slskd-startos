@@ -82,13 +82,19 @@ export async function soulseekStatus(
   }
 }
 
-export async function lidarrStatus(
-  address: string,
-  apiKey: string,
-  downloadDir: string,
-  fileManager: string,
-  minutes: number,
-): Promise<Result> {
+export async function lidarrStatus({
+  address,
+  apiKey,
+  downloadDir,
+  fileManager,
+  minutes,
+}: {
+  address: string
+  apiKey: string
+  downloadDir: string
+  fileManager: string
+  minutes: number
+}): Promise<Result> {
   const get = (path: string) =>
     fetch(`http://${address}/api/v1${path}`, {
       headers: { 'X-Api-Key': apiKey },

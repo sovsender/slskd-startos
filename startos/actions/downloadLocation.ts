@@ -7,9 +7,9 @@ const { InputSpec, Value, Variants } = sdk
 
 const inputSpec = InputSpec.of({
   location: Value.union({
-    name: i18n('Download Location'),
+    name: i18n('File Manager'),
     description: i18n(
-      'The file manager and folder where finished downloads are saved. Choose the same file manager Lidarr uses, so Lidarr can import from this folder.',
+      'The file manager that holds the download folder. If you use Lidarr, choose the one Lidarr uses. Otherwise Lidarr cannot see the downloads.',
     ),
     default: 'filebrowser',
     variants: Variants.of({
@@ -19,7 +19,7 @@ const inputSpec = InputSpec.of({
           folder: Value.text({
             name: i18n('Folder'),
             description: i18n(
-              'Folder inside FileBrowser Quantum. Created automatically.',
+              'A folder just for downloads, such as slskd. Do not use your music library folder. Created automatically.',
             ),
             default: fileManagers.filebrowser.defaultFolder,
             required: true,
@@ -34,7 +34,7 @@ const inputSpec = InputSpec.of({
           folder: Value.text({
             name: i18n('Folder'),
             description: i18n(
-              'Folder inside NextExplorer, starting with one of its locations, such as Files. Created automatically.',
+              'A folder just for downloads, starting with one of the NextExplorer locations, such as Files/slskd. Do not use your music library folder. Created automatically.',
             ),
             default: fileManagers.nextexplorer.defaultFolder,
             required: true,
@@ -51,9 +51,9 @@ export const downloadLocation = sdk.Action.withInput(
   'download-location',
 
   async () => ({
-    name: i18n('Download Location'),
+    name: i18n('Download Folder'),
     description: i18n(
-      'Choose where slskd saves finished downloads. Saving restarts slskd.',
+      'The inbox where slskd saves finished downloads. Lidarr collects albums from here and moves them into your music library. Saving restarts slskd.',
     ),
     warning: null,
     allowedStatuses: 'any',

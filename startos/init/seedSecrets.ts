@@ -10,5 +10,6 @@ export const seedSecrets = sdk.setupOnInit(async (effects) => {
     jwtKey: store?.jwtKey ?? secret(),
     startosApiKey: store?.startosApiKey ?? secret(),
     soularrApiKey: store?.soularrApiKey ?? secret(),
+    pluginApiKey: store?.pluginApiKey ?? secret(),
   })
 })

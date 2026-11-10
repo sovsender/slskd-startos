@@ -48,3 +48,5 @@ export const slskdYml = FileHelper.yaml(
   { base: sdk.volumes.main, subpath: '/slskd/slskd.yml' },
   shape,
 )
+
+export type SlskdYml = z.infer<typeof shape>
